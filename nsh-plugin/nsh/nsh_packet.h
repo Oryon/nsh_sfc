@@ -68,6 +68,8 @@
  * 0x3 : Ethernet
  */
 
+#include <vppinfra/clib.h>
+
 typedef CLIB_PACKED(struct {
   u8 ver_o_c;
   u8 length;

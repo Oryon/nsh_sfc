@@ -1138,6 +1138,8 @@ clib_error_t *nsh_init (vlib_main_t *vm)
   ASSERT(gre_input_node);
   vlib_node_add_next (vm, gre_input_node->index, nsh_input_node.index);
 
+  ethernet_register_input_type(vm, ETHERNET_TYPE_VPATH_3, nsh_input_node.index);
+
   vec_free(name);
 
   return error;
