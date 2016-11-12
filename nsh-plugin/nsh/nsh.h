@@ -135,6 +135,6 @@ typedef enum {
   NSH_ACTION_SWAP,
   NSH_ACTION_PUSH,
   NSH_ACTION_POP
-};
+} nsh_action_t;
 
 #endif /* included_nsh_h */

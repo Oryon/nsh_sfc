@@ -113,6 +113,8 @@ vlib_plugin_register (vlib_main_t * vm, vnet_plugin_handoff_t * h,
   return error;
 }
 
+extern vlib_node_registration_t nsh_input_node;
+
 typedef struct {
   nsh_header_t nsh_header;
 } nsh_input_trace_t;
@@ -185,7 +187,7 @@ u8 * format_nsh_map (u8 * s, va_list * args)
 	break;
       }
     default:
-      s = format (s, "only GRE and VXLANGPE support in this rev");
+      s = format (s, "other: %d", map->next_node);
     }
 
   return s;
@@ -336,6 +338,7 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
   u32 sw_if_index = ~0; // temporary requirement to get this moved over to NSHSFC
   nsh_add_del_map_args_t _a, * a = &_a;
   u32 map_index;
+  u8 *node_name = 0;
   int rv;
 
   /* Get a line of input. */
@@ -362,6 +365,27 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
       next_node = NSH_INPUT_NEXT_ENCAP_VXLANGPE;
     else if (unformat (line_input, "encap-none"))
       next_node = NSH_INPUT_NEXT_DROP; // Once moved to NSHSFC see nsh.h:foreach_nsh_input_next to handle this case
+    else if (unformat (line_input, "encap-other %s %d", &node_name, &sw_if_index))
+      {
+	vlib_node_t * input_node = vlib_get_node(vm, nsh_input_node.index);
+	vlib_node_t * next_node_n = vlib_get_node_by_name(vm, node_name);
+	if (!next_node_n)
+	  return clib_error_return (0, "no such node: %s", node_name);
+
+	next_node = ~0;
+	int i;
+	for (i=0; i<vec_len (input_node->next_nodes); i++)
+	  if (input_node->next_nodes[i] == next_node_n->index)
+	    {
+	      next_node = i;
+	      break;
+	    }
+
+	if (next_node == ~0)
+	  return clib_error_return (0, "invalid next node '%s' for nsh-input",
+				    node_name);
+	vec_free(node_name);
+      }
     else
       return clib_error_return (0, "parse error: '%U'",
                                 format_unformat_error, line_input);
@@ -379,7 +403,8 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
     return clib_error_return (0, "nsh_action required: swap|push|pop.");
 
   if (next_node == ~0)
-    return clib_error_return (0, "must specific action: [encap-gre-intf <nn> | encap-vxlan-gpe-intf <nn> | encap-none]");
+    return clib_error_return (0, "must specific action: [encap-gre-intf <nn> | encap-vxlan-gpe-intf <nn> | "
+			      "encap-none | encap-other <name> <sw_if_index>]");
 
   memset (a, 0, sizeof (*a));
 
@@ -415,7 +440,7 @@ VLIB_CLI_COMMAND (create_nsh_map_command, static) = {
   .path = "create nsh map",
   .short_help =
   "create nsh map nsp <nn> nsi <nn> [del] mapped-nsp <nn> mapped-nsi <nn> nsh_action [swap|push|pop] "
-  "[encap-gre-intf <nn> | encap-vxlan-gpe-intf <nn> | encap-none]\n",
+  "[encap-gre-intf <nn> | encap-vxlan-gpe-intf <nn> | encap-none | encap-other <name> <sw_if_index>]\n",
   .function = nsh_add_del_map_command_fn,
 };
 

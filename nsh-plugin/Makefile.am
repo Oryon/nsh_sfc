@@ -12,7 +12,7 @@
 # limitations under the License.
 
 AUTOMAKE_OPTIONS = foreign subdir-objects
-SUBDIRS=java
+#SUBDIRS=java
 AM_CFLAGS = -Wall -I@TOOLKIT_INCLUDE@
 
 nsh_plugin_la_CPPFLAGS = -DDEBUG -g
@@ -44,13 +44,7 @@ nsh_test_plugin_la_SOURCES = \
 nsh_test_plugin_la_LDFLAGS = -module
 
 install-data-hook:
-	mkdir $(prefix)/lib/vpp_plugins || true
-	mkdir $(prefix)/lib/vpp_api_test_plugins || true
-	cp $(prefix)/lib/nsh_plugin.so.*.*.* $(prefix)/lib/vpp_plugins/nsh_plugin.so
-	cp $(prefix)/lib/nsh_test_plugin.so.*.*.* \
-		$(prefix)/lib/vpp_api_test_plugins/nsh_test_plugin.so
-	rm -f $(prefix)/lib/nsh_plugin.*
-	rm -f $(prefix)/lib/nsh_test_plugin.*
+	echo 1 > /dev/null
 
 pkg-rpm: all install
 	cd $(srcdir)/packaging/rpm; \
