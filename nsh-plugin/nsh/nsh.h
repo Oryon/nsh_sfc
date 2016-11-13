@@ -41,6 +41,9 @@ typedef struct {
 
   u32 next_node;
 
+  u8 encap_length;
+  u64 encap_header[2];
+
 } nsh_map_t;
 
 typedef struct {

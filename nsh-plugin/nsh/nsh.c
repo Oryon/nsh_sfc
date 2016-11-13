@@ -187,7 +187,9 @@ u8 * format_nsh_map (u8 * s, va_list * args)
 	break;
       }
     default:
-      s = format (s, "other: %d", map->next_node);
+      s = format (s, "other: %v idx:%d", vlib_get_next_node(vlib_get_main(),
+                                                        nsh_input_node.index, map->next_node)->name,
+                  map->sw_if_index);
     }
 
   return s;
@@ -340,6 +342,7 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
   u32 map_index;
   u8 *node_name = 0;
   int rv;
+  u8 *header_data = 0;
 
   /* Get a line of input. */
   if (! unformat_user (input, unformat_line_input, line_input))
@@ -386,6 +389,13 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
 				    node_name);
 	vec_free(node_name);
       }
+    else if (unformat (line_input, "encap-ethernet %d %U", &sw_if_index, unformat_hex_string, &header_data))
+      {
+	vnet_main_t *vnm = vnet_get_main();
+	vnet_hw_interface_t *h = vnet_get_sup_hw_interface(vnm, sw_if_index);
+	u32 output_node_index = h->output_node_index;
+	next_node = vlib_node_add_next(vm, nsh_input_node.index, output_node_index);
+      }
     else
       return clib_error_return (0, "parse error: '%U'",
                                 format_unformat_error, line_input);
@@ -404,7 +414,7 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
 
   if (next_node == ~0)
     return clib_error_return (0, "must specific action: [encap-gre-intf <nn> | encap-vxlan-gpe-intf <nn> | "
-			      "encap-none | encap-other <name> <sw_if_index>]");
+			      "encap-none | encap-other <name> <sw_if_index>] | encap-ethernet <sw-if-index> <ethernet-header>");
 
   memset (a, 0, sizeof (*a));
 
@@ -415,7 +425,9 @@ nsh_add_del_map_command_fn (vlib_main_t * vm,
   a->map.nsh_action = nsh_action;
   a->map.sw_if_index = sw_if_index;
   a->map.next_node = next_node;
-
+  a->map.encap_length = vec_len(header_data);
+  if (vec_len(header_data))
+    memcpy(a->map.encap_header, header_data, vec_len(header_data));
 
   rv = nsh_add_del_map (a, &map_index);
 
@@ -874,7 +886,7 @@ nsh_input_map (vlib_main_t * vm,
       u32 n_left_to_next;
 
       vlib_get_next_frame(vm, node, next_index, to_next, n_left_to_next);
-
+#if 0
       while (n_left_from >= 4 && n_left_to_next >= 2)
 	{
 	  u32 bi0, bi1;
@@ -993,7 +1005,7 @@ nsh_input_map (vlib_main_t * vm,
 					  n_left_to_next, bi0, bi1, next0, next1);
 
 	}
-
+#endif
       while (n_left_from > 0 && n_left_to_next > 0)
 	{
 	  u32 bi0;
@@ -1046,6 +1058,9 @@ nsh_input_map (vlib_main_t * vm,
 	  /* set up things for next node to transmit ie which node to handle it and where */
 	  next0 = map0->next_node;
 	  vnet_buffer(b0)->sw_if_index[VLIB_TX] = map0->sw_if_index;
+
+	  vlib_buffer_advance(b0, -map0->encap_length);
+	  clib_memcpy(vlib_buffer_get_current(b0), map0->encap_header, map0->encap_length);
 
 	trace00: b0->error = error0 ? node->errors[error0] : 0;
 
