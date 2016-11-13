@@ -275,7 +275,9 @@ int nsh_add_del_map (nsh_add_del_map_args_t *a, u32 * map_indexp)
       map->nsh_action = a->map.nsh_action;
       map->sw_if_index = a->map.sw_if_index;
       map->next_node = a->map.next_node;
-
+      map->encap_header[0] = a->map.encap_header[0];
+      map->encap_header[1] = a->map.encap_header[1];
+      map->encap_length = a->map.encap_length;
 
       key_copy = clib_mem_alloc (sizeof (*key_copy));
       clib_memcpy (key_copy, &key, sizeof (*key_copy));
@@ -1068,6 +1070,7 @@ nsh_input_map (vlib_main_t * vm,
 	    {
 	      nsh_input_trace_t *tr = vlib_add_trace(vm, node, b0, sizeof(*tr));
 	      tr->nsh_header = *hdr0;
+	      vlib_trace_next_frame(vm, node, next0);
 	    }
 
 	  vlib_validate_buffer_enqueue_x1(vm, node, next_index, to_next,
